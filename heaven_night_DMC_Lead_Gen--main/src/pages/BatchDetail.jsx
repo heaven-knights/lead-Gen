@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { toast } from 'react-hot-toast';
@@ -321,6 +320,7 @@ export default function BatchDetail() {
                             <tr className="border-b border-gray-800 bg-gray-900/50">
                                 <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Company</th>
                                 <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Email</th>
+                                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Owner Email</th>
                                 <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Phone</th>
                                 <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Location</th>
                                 <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
@@ -353,6 +353,16 @@ export default function BatchDetail() {
                                             <div className="flex items-center gap-2 text-sm text-gray-300">
                                                 <Mail className="h-4 w-4 text-gray-500" />
                                                 {lead.primary_email}
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-red-400 bg-red-900/10 px-2 py-0.5 rounded">No Email</span>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        {lead.owner_email ? (
+                                            <div className="flex items-center gap-2 text-sm text-gray-300">
+                                                <Mail className="h-4 w-4 text-gray-500" />
+                                                {lead.owner_email}
                                             </div>
                                         ) : (
                                             <span className="text-xs text-red-400 bg-red-900/10 px-2 py-0.5 rounded">No Email</span>
@@ -405,7 +415,7 @@ export default function BatchDetail() {
                             ))}
                             {leads.length === 0 && (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                                    <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
                                         No leads found in this batch.
                                     </td>
                                 </tr>
@@ -445,6 +455,13 @@ export default function BatchDetail() {
                                     <div className="flex items-center gap-2 text-gray-300">
                                         <Mail className="h-4 w-4 text-gray-500" />
                                         {lead.primary_email}
+                                    </div>
+                                )}
+                                {lead.owner_email && (
+                                    <div className="flex items-center gap-2 text-gray-300">
+                                        <Mail className="h-4 w-4 text-gray-500" />
+                                        <span className="text-xs text-gray-500 mr-1">Owner:</span>
+                                        {lead.owner_email}
                                     </div>
                                 )}
                                 {lead.primary_phone && (
