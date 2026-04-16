@@ -1,8 +1,7 @@
-
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { supabase } from '../lib/supabase';
-import { toast } from 'react-hot-toast';
+import { toast } from 'react-hot-toast';;
 import {
     Loader2,
     Plus,
@@ -12,9 +11,148 @@ import {
     X,
     Upload,
     Save,
-    Paperclip
+    Paperclip,
+    Bold,
+    Italic,
+    Underline,
+    List,
+    ListOrdered,
+    Link,
+    Eraser
 } from 'lucide-react';
 
+/* ─────────────────────────────────────────────
+   Rich Text Editor Component
+   Supports: Bold, Italic, Underline,
+             Bullet List, Numbered List, Links
+───────────────────────────────────────────── */
+function RichTextEditor({ value, onChange, placeholder, minHeight = 200 }) {
+    const editorRef = useRef(null);
+    const skipSyncRef = useRef(false);
+
+    // Sync incoming value into the editor only when it changes from outside
+    useEffect(() => {
+        if (!editorRef.current) return;
+        if (skipSyncRef.current) { skipSyncRef.current = false; return; }
+        const current = editorRef.current.innerHTML;
+        const incoming = value || '';
+        if (current !== incoming) {
+            editorRef.current.innerHTML = incoming;
+        }
+    }, [value]);
+
+    const handleInput = useCallback(() => {
+        skipSyncRef.current = true;
+        onChange(editorRef.current?.innerHTML || '');
+    }, [onChange]);
+
+    const execCmd = (command, val = null) => {
+        editorRef.current?.focus();
+        document.execCommand(command, false, val);
+        // Manually fire input handler after execCommand
+        setTimeout(() => {
+            skipSyncRef.current = true;
+            onChange(editorRef.current?.innerHTML || '');
+        }, 0);
+    };
+
+    const handleLink = () => {
+        const selection = window.getSelection();
+        const selectedText = selection?.toString();
+        const url = window.prompt('Enter the URL:', 'https://');
+        if (!url) return;
+        if (selectedText) {
+            execCmd('createLink', url);
+        } else {
+            const linkText = window.prompt('Enter link display text:', 'Click here') || url;
+            const html = `<a href="${url}" target="_blank" rel="noopener noreferrer">${linkText}</a>`;
+            editorRef.current?.focus();
+            document.execCommand('insertHTML', false, html);
+            setTimeout(() => {
+                skipSyncRef.current = true;
+                onChange(editorRef.current?.innerHTML || '');
+            }, 0);
+        }
+    };
+
+    const ToolbarBtn = ({ onClick, title, children, danger }) => (
+        <button
+            type="button"
+            onMouseDown={e => { e.preventDefault(); onClick(); }}
+            title={title}
+            className={`flex items-center justify-center w-8 h-7 rounded text-sm transition-colors
+                ${danger
+                    ? 'text-red-400 hover:text-red-300 hover:bg-red-900/20'
+                    : 'text-gray-300 hover:text-white hover:bg-gray-600'}`}
+        >
+            {children}
+        </button>
+    );
+
+    return (
+        <div className="border border-gray-700 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 transition-all">
+            {/* ── Toolbar ── */}
+            <div className="flex items-center gap-0.5 px-2 py-1.5 bg-gray-850 bg-gray-800 border-b border-gray-700 flex-wrap">
+                <ToolbarBtn onClick={() => execCmd('bold')} title="Bold (Ctrl+B)">
+                    <Bold className="h-3.5 w-3.5" />
+                </ToolbarBtn>
+                <ToolbarBtn onClick={() => execCmd('italic')} title="Italic (Ctrl+I)">
+                    <Italic className="h-3.5 w-3.5" />
+                </ToolbarBtn>
+                <ToolbarBtn onClick={() => execCmd('underline')} title="Underline (Ctrl+U)">
+                    <Underline className="h-3.5 w-3.5" />
+                </ToolbarBtn>
+
+                <div className="w-px h-5 bg-gray-600 mx-1.5" />
+
+                <ToolbarBtn onClick={() => execCmd('insertUnorderedList')} title="Bullet List">
+                    <List className="h-3.5 w-3.5" />
+                </ToolbarBtn>
+                <ToolbarBtn onClick={() => execCmd('insertOrderedList')} title="Numbered List">
+                    <ListOrdered className="h-3.5 w-3.5" />
+                </ToolbarBtn>
+
+                <div className="w-px h-5 bg-gray-600 mx-1.5" />
+
+                <ToolbarBtn onClick={handleLink} title="Insert / Wrap Link">
+                    <Link className="h-3.5 w-3.5" />
+                </ToolbarBtn>
+
+                <div className="flex-1" />
+
+                <ToolbarBtn onClick={() => execCmd('removeFormat')} title="Clear Formatting" danger>
+                    <Eraser className="h-3.5 w-3.5" />
+                </ToolbarBtn>
+            </div>
+
+            {/* ── Editable Area ── */}
+            <style>{`
+                .rte-editor:empty:before {
+                    content: attr(data-placeholder);
+                    color: #4b5563;
+                    pointer-events: none;
+                }
+                .rte-editor ul { list-style: disc; padding-left: 1.25rem; margin: 0.25rem 0; }
+                .rte-editor ol { list-style: decimal; padding-left: 1.25rem; margin: 0.25rem 0; }
+                .rte-editor a  { color: #60a5fa; text-decoration: underline; }
+                .rte-editor b, .rte-editor strong { font-weight: 700; }
+            `}</style>
+            <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={handleInput}
+                data-placeholder={placeholder}
+                className="rte-editor bg-gray-800 text-white px-4 py-3 text-sm leading-relaxed outline-none overflow-y-auto"
+                style={{ minHeight }}
+            />
+        </div>
+    );
+}
+
+/* ─────────────────────────────────────────────
+   Main EmailTemplates Page
+───────────────────────────────────────────── */
 export default function EmailTemplates() {
     const [templates, setTemplates] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -130,7 +268,6 @@ export default function EmailTemplates() {
 
             if (uploadError) throw uploadError;
 
-            // Get Public URL
             const { data: publicUrlData } = supabase.storage
                 .from('template-files')
                 .getPublicUrl(filePath);
@@ -155,8 +292,6 @@ export default function EmailTemplates() {
         }
     };
 
-
-
     const handleMainImageChange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -167,7 +302,6 @@ export default function EmailTemplates() {
             const fileName = `main-image-${Math.random()}.${fileExt}`;
             const filePath = `${fileName}`;
 
-            // Using same bucket for now, or could use a new 'template-images' bucket
             const { error: uploadError } = await supabase.storage
                 .from('template-files')
                 .upload(filePath, file);
@@ -211,13 +345,9 @@ export default function EmailTemplates() {
                 if (error) throw error;
                 toast.success('Template updated');
             } else {
-                // Get Org ID (Assuming user has one, or fetch from profile/auth)
-                // For simplicity, we'll try to get it from the session user's profile or context
-                // But typically we should have it. Let's try to fetch user's org first if not available.
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) throw new Error('Not authenticated');
 
-                // Quick fetch org_id from profiles
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('org_id')
@@ -225,11 +355,6 @@ export default function EmailTemplates() {
                     .single();
 
                 if (!profile?.org_id) {
-                    // Fallback: try to find any org or create one?
-                    // Assuming the system is set up properly
-                    // For now, let's grab the first org the user belongs to (if implementing many-to-many)
-                    // or just use the one from profile.
-                    // If null, we might fail constraint.
                     throw new Error('User organization not found');
                 }
 
@@ -319,6 +444,7 @@ export default function EmailTemplates() {
                     </button>
                 </div>
             ) : (
+                /* ── Template Cards Grid — UNCHANGED ── */
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {templates.map((template) => (
                         <div key={template.id} className="group bg-gray-900/40 border border-gray-800 hover:border-gray-700 p-6 rounded-2xl transition-all hover:bg-gray-900/60 hover:shadow-xl flex flex-col h-full">
@@ -363,10 +489,16 @@ export default function EmailTemplates() {
                 </div>
             )}
 
-            {/* Create/Edit Modal */}
+            {/* ── Create / Edit Modal ── */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={handleCloseModal}>
-                    <div className="bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-6 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+                    onClick={handleCloseModal}
+                >
+                    <div
+                        className="bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-6 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto"
+                        onClick={e => e.stopPropagation()}
+                    >
                         <div className="flex justify-between items-center">
                             <h2 className="text-2xl font-bold text-white">
                                 {editingTemplate ? 'Edit Template' : 'New Template'}
@@ -377,6 +509,7 @@ export default function EmailTemplates() {
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-5">
+                            {/* Name + Type */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-400 mb-1.5">Template Name</label>
@@ -403,6 +536,7 @@ export default function EmailTemplates() {
                                 </div>
                             </div>
 
+                            {/* Subject */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-400 mb-1.5">Subject Line</label>
                                 <input
@@ -414,40 +548,49 @@ export default function EmailTemplates() {
                                 />
                             </div>
 
+                            {/* ── COLD: Rich Text Body ── */}
                             {formData.type === 'cold' && (
                                 <div>
                                     <label className="block text-sm font-medium text-gray-400 mb-1.5">Email Body</label>
-                                    <textarea
-                                        rows={8}
-                                        placeholder="Hi {{first_name}}, ..."
-                                        className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all font-mono text-sm leading-relaxed"
+
+                                    {/* Toolbar hint */}
+                                    <p className="text-xs text-gray-500 mb-2">
+                                        Use the toolbar to add <strong className="text-gray-400">bold</strong>, <em className="text-gray-400">italic</em>, bullet lists, numbered lists, and links.
+                                    </p>
+
+                                    <RichTextEditor
                                         value={formData.body}
-                                        onChange={e => setFormData({ ...formData, body: e.target.value })}
+                                        onChange={val => setFormData(prev => ({ ...prev, body: val }))}
+                                        placeholder="Hi {{first_name}}, ..."
+                                        minHeight={200}
                                     />
+
                                     <p className="text-xs text-gray-500 mt-2">
-                                        Supported variables: <code className="bg-gray-800 px-1 py-0.5 rounded">{'{{company_name}}'}</code>, <code className="bg-gray-800 px-1 py-0.5 rounded">{'{{first_name}}'}</code>, <code className="bg-gray-800 px-1 py-0.5 rounded">{'{{website}}'}</code>
+                                        Supported variables:{' '}
+                                        <code className="bg-gray-800 px-1 py-0.5 rounded">{'{{company_name}}'}</code>,{' '}
+                                        <code className="bg-gray-800 px-1 py-0.5 rounded">{'{{first_name}}'}</code>,{' '}
+                                        <code className="bg-gray-800 px-1 py-0.5 rounded">{'{{website}}'}</code>
                                     </p>
                                 </div>
                             )}
 
-
-
-                            {/* Promotional / Seasonal Specific Fields */}
+                            {/* ── PROMOTIONAL / SEASONAL ── */}
                             {(formData.type === 'promotional' || formData.type === 'seasonal') && (
                                 <div className="space-y-5 border-t border-gray-800 pt-5">
                                     <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Promotional Content</h3>
 
+                                    {/* Intro text — Rich Text */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-400 mb-1.5">Content Above Image</label>
-                                        <textarea
-                                            rows={3}
+                                        <RichTextEditor
+                                            value={formData.intro_text}
+                                            onChange={val => setFormData(prev => ({ ...prev, intro_text: val }))}
                                             placeholder="Intro text displayed before the main image..."
-                                            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all font-mono text-sm leading-relaxed"
-                                            value={formData.intro_text || ''}
-                                            onChange={e => setFormData({ ...formData, intro_text: e.target.value })}
+                                            minHeight={100}
                                         />
                                     </div>
 
+                                    {/* Main Image */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-400 mb-1.5">Main Image</label>
                                         <div className="flex items-start gap-4">
@@ -480,17 +623,18 @@ export default function EmailTemplates() {
                                         </div>
                                     </div>
 
+                                    {/* Outro text — Rich Text */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-400 mb-1.5">Content Below Image</label>
-                                        <textarea
-                                            rows={3}
+                                        <RichTextEditor
+                                            value={formData.outro_text}
+                                            onChange={val => setFormData(prev => ({ ...prev, outro_text: val }))}
                                             placeholder="Details or text displayed after the main image..."
-                                            className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all font-mono text-sm leading-relaxed"
-                                            value={formData.outro_text || ''}
-                                            onChange={e => setFormData({ ...formData, outro_text: e.target.value })}
+                                            minHeight={100}
                                         />
                                     </div>
 
+                                    {/* Redirect URL */}
                                     <div>
                                         <label className="block text-sm font-medium text-gray-400 mb-1.5">Redirect URL</label>
                                         <input
@@ -505,6 +649,7 @@ export default function EmailTemplates() {
                                 </div>
                             )}
 
+                            {/* Attachments */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-400 mb-1.5">Attachments (Max 2)</label>
                                 <div className="space-y-3">
@@ -554,6 +699,7 @@ export default function EmailTemplates() {
                                 </div>
                             </div>
 
+                            {/* Actions */}
                             <div className="flex justify-end gap-3 pt-4 border-t border-gray-800 mt-2">
                                 <button
                                     type="button"
@@ -575,6 +721,7 @@ export default function EmailTemplates() {
                     </div>
                 </div>
             )}
+
             <ConfirmationModal
                 isOpen={confirmationModal.isOpen}
                 onClose={closeConfirmationModal}
