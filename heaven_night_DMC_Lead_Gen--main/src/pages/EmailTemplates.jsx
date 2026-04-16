@@ -29,6 +29,28 @@ import {
 function RichTextEditor({ value, onChange, placeholder, minHeight = 200 }) {
     const editorRef = useRef(null);
     const skipSyncRef = useRef(false);
+    const [activeFormats, setActiveFormats] = useState({
+        bold: false,
+        italic: false,
+        underline: false,
+        insertUnorderedList: false,
+        insertOrderedList: false,
+    });
+
+    const updateActiveFormats = useCallback(() => {
+        setActiveFormats({
+            bold: document.queryCommandState('bold'),
+            italic: document.queryCommandState('italic'),
+            underline: document.queryCommandState('underline'),
+            insertUnorderedList: document.queryCommandState('insertUnorderedList'),
+            insertOrderedList: document.queryCommandState('insertOrderedList'),
+        });
+    }, []);
+
+    useEffect(() => {
+        document.addEventListener('selectionchange', updateActiveFormats);
+        return () => document.removeEventListener('selectionchange', updateActiveFormats);
+    }, [updateActiveFormats]);
 
     // Sync incoming value into the editor only when it changes from outside
     useEffect(() => {
@@ -49,10 +71,10 @@ function RichTextEditor({ value, onChange, placeholder, minHeight = 200 }) {
     const execCmd = (command, val = null) => {
         editorRef.current?.focus();
         document.execCommand(command, false, val);
-        // Manually fire input handler after execCommand
         setTimeout(() => {
             skipSyncRef.current = true;
             onChange(editorRef.current?.innerHTML || '');
+            updateActiveFormats();
         }, 0);
     };
 
@@ -71,11 +93,12 @@ function RichTextEditor({ value, onChange, placeholder, minHeight = 200 }) {
             setTimeout(() => {
                 skipSyncRef.current = true;
                 onChange(editorRef.current?.innerHTML || '');
+                updateActiveFormats();
             }, 0);
         }
     };
 
-    const ToolbarBtn = ({ onClick, title, children, danger }) => (
+    const ToolbarBtn = ({ onClick, title, children, danger, active }) => (
         <button
             type="button"
             onMouseDown={e => { e.preventDefault(); onClick(); }}
@@ -83,7 +106,9 @@ function RichTextEditor({ value, onChange, placeholder, minHeight = 200 }) {
             className={`flex items-center justify-center w-8 h-7 rounded text-sm transition-colors
                 ${danger
                     ? 'text-red-400 hover:text-red-300 hover:bg-red-900/20'
-                    : 'text-gray-300 hover:text-white hover:bg-gray-600'}`}
+                    : active
+                        ? 'text-white bg-blue-600 hover:bg-blue-500'
+                        : 'text-gray-300 hover:text-white hover:bg-gray-600'}`}
         >
             {children}
         </button>
@@ -93,22 +118,22 @@ function RichTextEditor({ value, onChange, placeholder, minHeight = 200 }) {
         <div className="border border-gray-700 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 transition-all">
             {/* ── Toolbar ── */}
             <div className="flex items-center gap-0.5 px-2 py-1.5 bg-gray-850 bg-gray-800 border-b border-gray-700 flex-wrap">
-                <ToolbarBtn onClick={() => execCmd('bold')} title="Bold (Ctrl+B)">
+                <ToolbarBtn onClick={() => execCmd('bold')} title="Bold (Ctrl+B)" active={activeFormats.bold}>
                     <Bold className="h-3.5 w-3.5" />
                 </ToolbarBtn>
-                <ToolbarBtn onClick={() => execCmd('italic')} title="Italic (Ctrl+I)">
+                <ToolbarBtn onClick={() => execCmd('italic')} title="Italic (Ctrl+I)" active={activeFormats.italic}>
                     <Italic className="h-3.5 w-3.5" />
                 </ToolbarBtn>
-                <ToolbarBtn onClick={() => execCmd('underline')} title="Underline (Ctrl+U)">
+                <ToolbarBtn onClick={() => execCmd('underline')} title="Underline (Ctrl+U)" active={activeFormats.underline}>
                     <Underline className="h-3.5 w-3.5" />
                 </ToolbarBtn>
 
                 <div className="w-px h-5 bg-gray-600 mx-1.5" />
 
-                <ToolbarBtn onClick={() => execCmd('insertUnorderedList')} title="Bullet List">
+                <ToolbarBtn onClick={() => execCmd('insertUnorderedList')} title="Bullet List" active={activeFormats.insertUnorderedList}>
                     <List className="h-3.5 w-3.5" />
                 </ToolbarBtn>
-                <ToolbarBtn onClick={() => execCmd('insertOrderedList')} title="Numbered List">
+                <ToolbarBtn onClick={() => execCmd('insertOrderedList')} title="Numbered List" active={activeFormats.insertOrderedList}>
                     <ListOrdered className="h-3.5 w-3.5" />
                 </ToolbarBtn>
 
