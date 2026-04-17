@@ -284,7 +284,7 @@ export default function EmailTemplates() {
         setUploading(true);
         try {
             const fileExt = file.name.split('.').pop();
-            const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '_')}`;
+            const fileName = `${Date.now()}/${file.name.replace(/\s+/g, '_')}`;
             const filePath = `${fileName}`;
 
             const { error: uploadError } = await supabase.storage
